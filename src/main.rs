@@ -1,12 +1,25 @@
-#![no_std]
-#![no_main]
+#![no_std]  // Disable standard library
+#![no_main] // Disable main entry point
+
+extern crate rlibc; // Provides mem tools
 
 use core::panic::PanicInfo;
 
-extern crate rlibc;
+static MSG: &[u8] = b"rOS 0.1.0 OK";
 
-#[no_mangle]
+#[no_mangle] // Keep _start symbol intact
 pub extern "C" fn _start() -> ! {
+    
+    let vga_buffer = 0xb8000 as *mut u8;
+
+    // Write to buffer
+    for (i, &byte) in HELLO.iter().enumerate() {
+        unsafe {
+            *vga_buffer.offset(i as isize * 2) = byte;
+            *vga_buffer.offset(i as isize * 2 + 1) = 0xb; // Cyan
+        }
+    }
+
     loop {}
 }
 
