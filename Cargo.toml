@@ -1,0 +1,8 @@
+[package]
+name = "ros"
+version = "0.1.0"
+authors = ["bxvd"]
+edition = "2018"
+
+[dependencies]
+rlibc = "1.0.0"
