@@ -5,7 +5,7 @@ extern crate rlibc; // Provides mem tools
 
 use core::panic::PanicInfo;
 
-static MSG: &[u8] = b"rOS 0.1.0 OK";
+static MESSAGE: &[u8] = b"rOS 0.1.0 OK";
 
 #[no_mangle] // Keep _start symbol intact
 pub extern "C" fn _start() -> ! {
@@ -13,7 +13,7 @@ pub extern "C" fn _start() -> ! {
     let vga_buffer = 0xb8000 as *mut u8;
 
     // Write to buffer
-    for (i, &byte) in HELLO.iter().enumerate() {
+    for (i, &byte) in MESSAGE.iter().enumerate() {
         unsafe {
             *vga_buffer.offset(i as isize * 2) = byte;
             *vga_buffer.offset(i as isize * 2 + 1) = 0xb; // Cyan
