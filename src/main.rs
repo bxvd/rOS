@@ -3,6 +3,8 @@
 
 extern crate rlibc; // Provides mem tools
 
+mod vga;
+
 use core::panic::PanicInfo;
 
 static MESSAGE: &[u8] = b"rOS 0.1.0 OK";
