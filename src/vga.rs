@@ -1,5 +1,7 @@
+use core::fmt;
 use volatile::Volatile;
 
+// Display dimensions
 const BUFFER_WIDTH: usize = 80;
 const BUFFER_HEIGHT: usize = 25;
 
@@ -25,8 +27,12 @@ pub enum Color {
     White = 15,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
+/*
+ * Char colour represented as a byte with first four bits as bg colour
+ * and next four as fg.
+ */
+#[derive(Debug, Clone, Copy, PartialEq, Eq)] // Define memory behaviour
+#[repr(transparent)] // Represent as underlying type (u8) in memory
 struct ColorCode(u8);
 
 impl ColorCode {
@@ -35,19 +41,31 @@ impl ColorCode {
     }
 }
 
+/*
+ * Character and colour value for writing to buffer.
+ */
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(C)]
-struct DisplayChar {
+#[repr(C)] // Represent as C-like in memory
+struct ScreenChar {
     ascii_char: u8,
     color_code: ColorCode,
 }
 
+/*
+ * 2D array of ScreenChars representing the screen buffer. Volatile wrapper
+ * used to guarantee that the value won't be optimised out since we are never
+ * explicitly reading the buffer value from memory.
+ */
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 struct Buffer {
-    chars: [[Volatile<DisplayChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+/*
+ * Writer class to handle writing to the buffer (VGA will write buffer to screen
+ * automatically).
+ */
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
@@ -68,7 +86,7 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                self.buffer.chars[row][col].write(DisplayChar {
+                self.buffer.chars[row][col].write(ScreenChar {
                     ascii_char: byte,
                     color_code: self.color_code,
                 });
@@ -78,29 +96,73 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, string: &str) {
-        for byte in string.bytes() {
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
             match byte {
 
+                // Valid ASCII characters
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
 
+                // Not valid ASCII
                 _ => self.write_byte(0xfe),
             }
         }
     }
 
-    fn new_line(&mut self) {}
+    // Re-write every char up one row and clear current row
+    fn new_line(&mut self) {
+
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+
+                let character = self.buffer[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
+            }
+        }
+
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
+    }
+
+    fn clear_row(&mut self, row: usize) {
+
+        let blank = ScreenChar {
+            ascii_char: b' ',
+            color_code: self.color_code,
+        };
+
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
+    }
 }
 
+/*
+ * Implement Rust's string formatting, allowing us to use write!() to
+ * write to buffer.
+ */
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+
+        self.write_string(s);
+        Ok(())
+    }
+}
+
+/*
+ * For testing the module.
+ */
 pub fn print_something() {
+
+    use core::fmt::Write;
 
     let mut writer = Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }, // 0xb8000 is memory address for the VGA buffer
     };
 
     writer.write_byte(b'H');
-    writer.write_string("ello ");
-    writer.write_string("Wörld!");
+    writer.write_string("ello! ");
+    write!(writer, "The numbers are {} and {}", 42, 1.0/3.0).unwrap(); // unwrap() needed to satisfy Rust's Result return type
 }
