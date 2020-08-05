@@ -1,3 +1,5 @@
+use volatile::Volatile;
+
 const BUFFER_WIDTH: usize = 80;
 const BUFFER_HEIGHT: usize = 25;
 
@@ -40,8 +42,65 @@ struct DisplayChar {
     color_code: ColorCode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 #[repr(transparent)]
 struct Buffer {
-    chars: [[DisplayChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[Volatile<DisplayChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+}
+
+pub struct Writer {
+    column_position: usize,
+    color_code: ColorCode,
+    buffer: &'static mut Buffer,
+}
+
+impl Writer {
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+
+            b'\n' => self.new_line(),
+
+            byte => {
+
+                if self.column_position >= BUFFER_WIDTH { self.new_line() }
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                self.buffer.chars[row][col].write(DisplayChar {
+                    ascii_char: byte,
+                    color_code: self.color_code,
+                });
+
+                self.column_position += 1;
+            }
+        }
+    }
+
+    pub fn write_string(&mut self, string: &str) {
+        for byte in string.bytes() {
+            match byte {
+
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    fn new_line(&mut self) {}
+}
+
+pub fn print_something() {
+
+    let mut writer = Writer {
+        column_position: 0,
+        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    };
+
+    writer.write_byte(b'H');
+    writer.write_string("ello ");
+    writer.write_string("Wörld!");
 }
