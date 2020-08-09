@@ -10,7 +10,10 @@ use core::panic::PanicInfo;
 #[no_mangle] // Keep _start symbol intact
 pub extern "C" fn _start() -> ! {
     
-    vga::print_something();
+    use core::fmt::Write;
+
+    vga::WRITER.lock().write_str("OK").unwrap();
+    write!(vga::WRITER.lock(), " {} {}", 42, 1.0/3.0).unwrap();
 
     loop {}
 }

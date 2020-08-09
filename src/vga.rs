@@ -1,5 +1,15 @@
 use core::fmt;
 use volatile::Volatile;
+use lazy_static::lazy_static;
+use spin::Mutex;
+
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }, // 0xb8000 is memory address for the VGA buffer
+    });
+}
 
 // Display dimensions
 const BUFFER_WIDTH: usize = 80;
@@ -115,7 +125,7 @@ impl Writer {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
 
-                let character = self.buffer[row][col].read();
+                let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
@@ -147,22 +157,4 @@ impl fmt::Write for Writer {
         self.write_string(s);
         Ok(())
     }
-}
-
-/*
- * For testing the module.
- */
-pub fn print_something() {
-
-    use core::fmt::Write;
-
-    let mut writer = Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) }, // 0xb8000 is memory address for the VGA buffer
-    };
-
-    writer.write_byte(b'H');
-    writer.write_string("ello! ");
-    write!(writer, "The numbers are {} and {}", 42, 1.0/3.0).unwrap(); // unwrap() needed to satisfy Rust's Result return type
 }
